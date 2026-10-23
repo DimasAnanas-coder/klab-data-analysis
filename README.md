@@ -1,6 +1,6 @@
 # Запуск проекта
 
-Требуются Python 3.12 или новее, `uv` и PostgreSQL. Команды ниже приведены для PowerShell.
+Требуются Python 3.12 или новее, `uv` и Docker Desktop. Команды ниже приведены для PowerShell.
 
 1. Установить зависимости и создать виртуальное окружение:
 
@@ -8,27 +8,33 @@
    uv sync
    ```
 
-2. Создать базу данных PostgreSQL (команда `createdb` входит в клиентские утилиты PostgreSQL):
-
-   ```powershell
-   createdb -U postgres klab_data
-   ```
-
-3. Создать `.env` из шаблона и указать строку подключения:
+2. Создать `.env` из шаблона:
 
    ```powershell
    Copy-Item .env.example .env
    ```
 
-   Открой `.env` и замени `postgres` и `password` на имя пользователя и пароль своей базы. При подключении настройки загружаются через `python-dotenv`; переменная, уже заданная в окружении PowerShell, имеет приоритет.
+   В `.env` можно изменить имя базы, пользователя и пароль. `DATABASE_URL` формируется из этих значений. При подключении настройки загружаются через `python-dotenv`; переменная `DATABASE_URL`, заданная в PowerShell, имеет приоритет.
+
+3. Запустить PostgreSQL в Docker:
+
+   ```powershell
+   docker compose up -d
+   ```
+
+   Дождись статуса `healthy`:
+
+   ```powershell
+   docker compose ps
+   ```
 
 4. Создать таблицы и индексы:
 
    ```powershell
-   psql "postgresql://postgres:password@localhost:5432/klab_data" -f migrations/001_initial_schema.sql
+   docker compose exec -T db psql -U postgres -d klab_data -f /migrations/001_initial_schema.sql
    ```
 
-   Используй ту же строку подключения, что указал в `.env`.
+   Команда использует `postgres` и `klab_data` из шаблона. Если ты изменил имя базы или пользователя в `.env`, замени их в команде.
 
 5. Импортировать данные из `data/`:
 
@@ -43,6 +49,8 @@ uv run klab-data-analysis
 ```
 
 В меню можно найти версию продукта без известных уязвимостей или показать уязвимости для указанной версии. Название продукта вводится точно как в фиде. Если такое название есть у нескольких производителей, приложение предложит выбрать нужного.
+
+Остановить PostgreSQL можно командой `docker compose down`. Данные сохраняются в Docker volume и останутся после остановки контейнера. Чтобы удалить контейнер вместе с данными базы, выполни `docker compose down -v`.
 
 # Модель данных
 
