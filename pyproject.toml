@@ -1,7 +1,7 @@
 [project]
-name = "klab-data-analys"
+name = "klab-data-analysis"
 version = "0.1.0"
-description = "Add your description here"
+description = "Lookup product versions and vulnerability information"
 readme = "README.md"
 authors = [
     { name = "DimasAnanas-coder", email = "nikitin2007dima@gmail.com" }
@@ -12,7 +12,7 @@ dependencies = [
 ]
 
 [project.scripts]
-klab-data-analys = "klab_data_analys:main"
+klab-data-analysis = "klab_data_analysis.main:main"
 
 [build-system]
 requires = ["uv_build>=0.13.5,<0.14.0"]

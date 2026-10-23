@@ -65,7 +65,7 @@ wheels = [
 ]
 
 [[package]]
-name = "klab-data-analys"
+name = "klab-data-analysis"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
