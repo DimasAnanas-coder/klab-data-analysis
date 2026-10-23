@@ -33,7 +33,7 @@
 5. Импортировать данные из `data/`:
 
    ```powershell
-   uv run python -m klab_data_analysis.infrastructure.importer
+   uv run klab-data-import
    ```
 
 Команда `uv run klab-data-analysis` запускает консольную точку входа. Поиск продукта и уязвимостей будет добавлен на следующем этапе разработки.
