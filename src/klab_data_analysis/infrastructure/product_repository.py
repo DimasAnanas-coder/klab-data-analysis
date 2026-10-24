@@ -21,7 +21,10 @@ class ProductRepository:
                 """,
                 product_name,
             )
-        return [Product(id=row["id"], vendor=row["vendor"], name=row["name"]) for row in rows]
+        return [
+            Product(id=row["id"], vendor=row["vendor"], name=row["name"])
+            for row in rows
+        ]
 
     async def get_versions_for_product(self, product_id: int) -> list[str]:
         """Вернуть все известные версии продукта."""

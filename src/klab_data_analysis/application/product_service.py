@@ -22,8 +22,12 @@ class ProductService:
 
     async def get_safe_version(self, product_id: int) -> str | None:
         """Выбрать наибольшую исправленную версию или последнюю версию из фида."""
-        vulnerabilities = await self._repository.get_vulnerabilities_for_product(product_id)
-        fixed_versions = [row.fixed_version for row in vulnerabilities if row.fixed_version]
+        vulnerabilities = await self._repository.get_vulnerabilities_for_product(
+            product_id
+        )
+        fixed_versions = [
+            row.fixed_version for row in vulnerabilities if row.fixed_version
+        ]
         if fixed_versions:
             return max(fixed_versions, key=_version_key)
 
@@ -39,7 +43,9 @@ class ProductService:
     ) -> list[Vulnerability]:
         """Вернуть уязвимости, диапазон которых включает заданную версию."""
         version_number = _version_key(version)
-        vulnerabilities = await self._repository.get_vulnerabilities_for_product(product_id)
+        vulnerabilities = await self._repository.get_vulnerabilities_for_product(
+            product_id
+        )
 
         return [
             row

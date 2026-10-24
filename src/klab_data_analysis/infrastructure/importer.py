@@ -175,7 +175,9 @@ async def import_data() -> dict[str, ImportStats]:
     try:
         async with connection.transaction():
             product_ids, product_stats = await import_products(connection, product_keys)
-            version_stats = await import_versions(connection, VERSIONS_PATH, product_ids)
+            version_stats = await import_versions(
+                connection, VERSIONS_PATH, product_ids
+            )
             vulnerability_stats = await import_vulnerabilities(
                 connection, VULNERABILITIES_PATH, product_ids
             )
