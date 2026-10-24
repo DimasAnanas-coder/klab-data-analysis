@@ -1,10 +1,11 @@
 import asyncio
-import json
 from datetime import date
 from pathlib import Path
+from collections.abc import Iterator
 from typing import Any
 
 import asyncpg
+import ijson
 
 from ..config.path import VERSIONS_PATH, VULNERABILITIES_PATH
 from .database import connect
@@ -13,12 +14,10 @@ ProductKey = tuple[str, str]
 ImportStats = tuple[int, int]
 
 
-def load_json(path: Path) -> list[dict[str, Any]]:
-    with path.open(encoding="utf-8") as file:
-        rows = json.load(file)
-    if not isinstance(rows, list):
-        raise ValueError(f"Expected a JSON array in {path}")
-    return rows
+def iter_json_rows(path: Path) -> Iterator[dict[str, Any]]:
+    """Yield objects from a JSON array without reading the whole file at once."""
+    with path.open("rb") as file:
+        yield from ijson.items(file, "item")
 
 
 async def import_products(
@@ -56,13 +55,13 @@ async def import_products(
 
 async def import_versions(
     connection: asyncpg.Connection,
-    versions: list[dict[str, Any]],
+    versions_path: Path,
     product_ids: dict[ProductKey, int],
 ) -> ImportStats:
     inserted = 0
     existing = 0
 
-    for row in versions:
+    for row in iter_json_rows(versions_path):
         inserted_id = await connection.fetchval(
             """
             INSERT INTO product_versions (product_id, version)
@@ -83,13 +82,13 @@ async def import_versions(
 
 async def import_vulnerabilities(
     connection: asyncpg.Connection,
-    vulnerabilities: list[dict[str, Any]],
+    vulnerabilities_path: Path,
     product_ids: dict[ProductKey, int],
 ) -> ImportStats:
     inserted = 0
     existing = 0
 
-    for row in vulnerabilities:
+    for row in iter_json_rows(vulnerabilities_path):
         inserted_id = await connection.fetchval(
             """
             INSERT INTO vulnerabilities (
@@ -125,20 +124,19 @@ async def import_vulnerabilities(
 
 
 async def import_data() -> dict[str, ImportStats]:
-    vulnerabilities = load_json(VULNERABILITIES_PATH)
-    versions = load_json(VERSIONS_PATH)
     product_keys = {
         (row["vendor"], row["product"])
-        for row in [*vulnerabilities, *versions]
+        for path in (VULNERABILITIES_PATH, VERSIONS_PATH)
+        for row in iter_json_rows(path)
     }
 
     connection = await connect()
     try:
         async with connection.transaction():
             product_ids, product_stats = await import_products(connection, product_keys)
-            version_stats = await import_versions(connection, versions, product_ids)
+            version_stats = await import_versions(connection, VERSIONS_PATH, product_ids)
             vulnerability_stats = await import_vulnerabilities(
-                connection, vulnerabilities, product_ids
+                connection, VULNERABILITIES_PATH, product_ids
             )
     finally:
         await connection.close()
