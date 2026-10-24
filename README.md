@@ -31,10 +31,10 @@
 4. Создать таблицы и индексы:
 
    ```powershell
-   docker compose exec -T db psql -U postgres -d klab_data -f /migrations/001_initial_schema.sql
+   uv run klab-data-init
    ```
 
-   Команда использует `postgres` и `klab_data` из шаблона. Если ты изменил имя базы или пользователя в `.env`, замени их в команде.
+   Команда подключается к базе из `DATABASE_URL` и может запускаться повторно.
 
 5. Импортировать данные из `data/`:
 

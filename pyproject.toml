@@ -16,6 +16,7 @@ dependencies = [
 [project.scripts]
 klab-data-analysis = "klab_data_analysis.main:main"
 klab-data-import = "klab_data_analysis.infrastructure.importer:cli"
+klab-data-init = "klab_data_analysis.infrastructure.initializer:cli"
 
 [build-system]
 requires = ["uv_build>=0.13.5,<0.14.0"]
