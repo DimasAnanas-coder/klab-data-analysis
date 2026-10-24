@@ -8,6 +8,13 @@
    uv sync
    ```
 
+   Проверить код и применить форматирование можно командами:
+
+   ```powershell
+   uv run ruff check .
+   uv run ruff format .
+   ```
+
 2. Создать `.env` из шаблона:
 
    ```powershell
