@@ -1,7 +1,8 @@
 import asyncio
+from collections.abc import Iterator
 from datetime import date
 from pathlib import Path
-from collections.abc import Iterator
+from itertools import islice
 from typing import Any
 
 import asyncpg
@@ -12,6 +13,26 @@ from .database import connect
 
 ProductKey = tuple[str, str]
 ImportStats = tuple[int, int]
+BATCH_SIZE = 500
+
+
+def batches(items: Iterator[Any], size: int = BATCH_SIZE) -> Iterator[list[Any]]:
+    iterator = iter(items)
+    while batch := list(islice(iterator, size)):
+        yield batch
+
+
+def values_placeholders(row_count: int, column_count: int) -> str:
+    rows = []
+    for row in range(row_count):
+        start = row * column_count + 1
+        end = start + column_count
+        rows.append(f"({', '.join(f'${number}' for number in range(start, end))})")
+    return ", ".join(rows)
+
+
+def flatten_rows(rows: list[tuple[Any, ...]]) -> list[Any]:
+    return [value for row in rows for value in row]
 
 
 def iter_json_rows(path: Path) -> Iterator[dict[str, Any]]:
@@ -28,27 +49,40 @@ async def import_products(
     inserted = 0
     existing = 0
 
-    for vendor, name in sorted(product_keys):
-        product_id = await connection.fetchval(
-            """
+    product_rows = sorted(product_keys)
+    for batch in batches(iter(product_rows)):
+        placeholders = values_placeholders(len(batch), 2)
+        inserted_rows = await connection.fetch(
+            f"""
             INSERT INTO products (vendor, name)
-            VALUES ($1, $2)
+            VALUES {placeholders}
             ON CONFLICT (vendor, name) DO NOTHING
-            RETURNING id
+            RETURNING vendor, name, id
             """,
-            vendor,
-            name,
+            *flatten_rows(batch),
         )
-        if product_id is None:
-            existing += 1
-            product_id = await connection.fetchval(
-                "SELECT id FROM products WHERE vendor = $1 AND name = $2",
-                vendor,
-                name,
+        inserted_keys = set()
+        for row in inserted_rows:
+            key = (row["vendor"], row["name"])
+            inserted_keys.add(key)
+            product_ids[key] = row["id"]
+
+        missing_keys = [key for key in batch if key not in inserted_keys]
+        if missing_keys:
+            placeholders = values_placeholders(len(missing_keys), 2)
+            existing_rows = await connection.fetch(
+                f"""
+                SELECT vendor, name, id
+                FROM products
+                WHERE (vendor, name) IN (VALUES {placeholders})
+                """,
+                *flatten_rows(missing_keys),
             )
-        else:
-            inserted += 1
-        product_ids[(vendor, name)] = product_id
+            for row in existing_rows:
+                product_ids[(row["vendor"], row["name"])] = row["id"]
+
+        inserted += len(inserted_rows)
+        existing += len(missing_keys)
 
     return product_ids, (inserted, existing)
 
@@ -61,21 +95,23 @@ async def import_versions(
     inserted = 0
     existing = 0
 
-    for row in iter_json_rows(versions_path):
-        inserted_id = await connection.fetchval(
-            """
+    for batch in batches(iter_json_rows(versions_path)):
+        rows = [
+            (product_ids[(row["vendor"], row["product"])], row["version"])
+            for row in batch
+        ]
+        placeholders = values_placeholders(len(rows), 2)
+        inserted_rows = await connection.fetch(
+            f"""
             INSERT INTO product_versions (product_id, version)
-            VALUES ($1, $2)
+            VALUES {placeholders}
             ON CONFLICT (product_id, version) DO NOTHING
             RETURNING id
             """,
-            product_ids[(row["vendor"], row["product"])],
-            row["version"],
+            *flatten_rows(rows),
         )
-        if inserted_id is None:
-            existing += 1
-        else:
-            inserted += 1
+        inserted += len(inserted_rows)
+        existing += len(batch) - len(inserted_rows)
 
     return inserted, existing
 
@@ -88,9 +124,21 @@ async def import_vulnerabilities(
     inserted = 0
     existing = 0
 
-    for row in iter_json_rows(vulnerabilities_path):
-        inserted_id = await connection.fetchval(
-            """
+    for batch in batches(iter_json_rows(vulnerabilities_path)):
+        rows = [
+            (
+                product_ids[(row["vendor"], row["product"])],
+                row["KLA_id"],
+                row["description"],
+                date.fromisoformat(row["publish_date"]),
+                row["start_vuln_version"],
+                row["fixed_version"],
+            )
+            for row in batch
+        ]
+        placeholders = values_placeholders(len(rows), 6)
+        inserted_rows = await connection.fetch(
+            f"""
             INSERT INTO vulnerabilities (
                 product_id,
                 kla_id,
@@ -99,7 +147,7 @@ async def import_vulnerabilities(
                 start_vuln_version,
                 fixed_version
             )
-            VALUES ($1, $2, $3, $4, $5, $6)
+            VALUES {placeholders}
             ON CONFLICT (
                 product_id,
                 kla_id,
@@ -108,17 +156,10 @@ async def import_vulnerabilities(
             ) DO NOTHING
             RETURNING id
             """,
-            product_ids[(row["vendor"], row["product"])],
-            row["KLA_id"],
-            row["description"],
-            date.fromisoformat(row["publish_date"]),
-            row["start_vuln_version"],
-            row["fixed_version"],
+            *flatten_rows(rows),
         )
-        if inserted_id is None:
-            existing += 1
-        else:
-            inserted += 1
+        inserted += len(inserted_rows)
+        existing += len(batch) - len(inserted_rows)
 
     return inserted, existing
 
