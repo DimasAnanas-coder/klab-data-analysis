@@ -13,6 +13,7 @@
    ```powershell
    uv run ruff check .
    uv run ruff format .
+   uv run pytest
    ```
 
 2. Создать `.env` из шаблона:
