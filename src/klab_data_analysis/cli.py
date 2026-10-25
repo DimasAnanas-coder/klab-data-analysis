@@ -41,7 +41,7 @@ async def _show_safe_version(service: ProductService) -> None:
 
     version = await service.get_safe_version(product.id)
     if version is None:
-        print("Для продукта нет версий в базе.")
+        print("Не найдено версий без известных уязвимостей.")
         return
     print(f"Версия без известных уязвимостей: {version}")
 
