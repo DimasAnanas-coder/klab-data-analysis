@@ -38,7 +38,20 @@ def flatten_rows(rows: list[tuple[Any, ...]]) -> list[Any]:
 def iter_json_rows(path: Path) -> Iterator[dict[str, Any]]:
     """Yield objects from a JSON array without reading the whole file at once."""
     with path.open("rb") as file:
-        yield from ijson.items(file, "item")
+        while first_byte := file.read(1):
+            if not first_byte.isspace():
+                break
+        else:
+            raise ValueError(f"Expected a JSON array in {path}")
+
+        if first_byte != b"[":
+            raise ValueError(f"Expected a JSON array in {path}")
+
+        file.seek(0)
+        for row in ijson.items(file, "item"):
+            if not isinstance(row, dict):
+                raise ValueError(f"Expected JSON objects in {path}")
+            yield row
 
 
 async def import_products(
